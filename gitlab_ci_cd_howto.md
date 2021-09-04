@@ -22,8 +22,14 @@ Overview:
 As I understand, **Continuous Integration and Continuous Delivery (CI/CD)** consists in:
 - Frequently merging new features to our versioned code
 - Automatically and frequently building our codebase
+- Assessing the quality of our code
 - Automatically testing our built binaries
-- Frequently deploying our binaries to production
+- Frequently deploying our packages to production; deployment encompasses: installation in an environment and tests
+
+Therefore, CI/CD has these advantages:
+- It ensures that changes are releasable
+- It reduces the risk of a new deployment
+- It delivers value much faster
 
 Gitlab CI is gaining markets share in contrast to older CI/CD frameworks (e.g., Jenkins) because it integrates all steps for CI/CD in a platform.
 
@@ -108,3 +114,16 @@ If we look at the job shells, we'll see they are docker images which are built a
 Within the container, our repository is cloned and the pipeline executed. Then, the artifacts are saved and the container is destroyed.
 
 On the vertical menu under Settings > CI/CD > Runners we can select if we use the default shared runners provided by Gitlab or if we want to use our specific runners; the latter makes sense if we want to perform intensive CPU/GPU work in our pipelines.
+
+## Section 2: Basic CI/CD Workflow with Gitlab
+
+In this section a static website is built using `Node.js` and `npm`.
+`Node.js` is a Javascript runtime environment able to run Javascript without needing a browser; `npm` is the Node Package Manager.
+
+Installation:
+```bash
+brew install node
+node -v # we should see the version
+npm -v # we should see the version
+```
+
