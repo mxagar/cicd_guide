@@ -118,12 +118,39 @@ On the vertical menu under Settings > CI/CD > Runners we can select if we use th
 ## Section 2: Basic CI/CD Workflow with Gitlab
 
 In this section a static website is built using `Node.js` and `npm`.
-`Node.js` is a Javascript runtime environment able to run Javascript without needing a browser; `npm` is the Node Package Manager.
+`Node.js` is a Javascript runtime environment able to run Javascript without needing a browser; `npm` is the Node Package Manager for it.
 
-Installation:
+Installation and Setup (on Mac):
 ```bash
 brew install node
 node -v # we should see the version
 npm -v # we should see the version
+# install Gatsby CLI
+npm install -g gatsby-cli
+# create a new website repository locally
+cd ~/git_repositories
+gatsby new static-website
+cd static-website
+# we start the local developer server
+gatsby develop
+# now, we can open our website
+# on the browser: localhost:8000
+#
+# On Gitlab, we create a new (private) project
+# my-static-website
+# and we connect it to the local repository that is created
+# when creating the website
+# note the name of the branch is master, not main...
+git remote add origin git@gitlab.com:mxagar/my-static-website.git
+git push -u origin master
+# We can create a bundle of files with gatsby
+# which collects all files necessary to deploy our website
+# The created bundle/folder is called public/
+# it will be our artifact
+gatsby build
+# We now open the local static-website project
+# with ane editor, say VS Code,
+# and create and edit a pipeline file:
+# gitlab-ci.yml
 ```
 
