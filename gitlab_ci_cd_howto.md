@@ -322,3 +322,192 @@ deploy to surge:
 
 ## Section 3: Gitlab CI Fundamentals
 
+Overview of the most important aspects reviewed in this section:
+- Environment variables.
+- Scheduling of pipeline runs.
+- Using cache to seep up builds.
+
+
+### 3.1 Predefined Variables
+
+Gitlab uses many **predefined** environment variables collected in this list:
+[Gitlab CI/CD Predefined Variables](https://docs.gitlab.com/ee/ci/variables/predefined_variables.html).
+
+Howver, more importantly, **we can also define variables according to the needs of the packages we use**, as we did with `surge`.
+
+Some of the variables commented in this section:
+- `CI_COMMIT_SHORT_SHA`: hash of the last commit done before running the pipeline.
+
+#### Example: `CI_COMMIT_SHORT_SHA`
+
+Let's say we'd like to add the hash of the commit to our website in order to display the version.
+We can use the environment variable `CI_COMMIT_SHORT_SHA` for that, together with a marker placed in `index.js`.
+
+First, we modify the `index.js`, which generates the `index.html` file:
+```bash
+# go to the folder where the index.html is and surge was run
+cd ~/git_repositories/static-website/src/pages
+# edit the JS file that generates the index.html file
+vim index.js
+# In the line right before </Layout>, we add
+# <p>Version: %%VERSION%%</p>
+```
+
+When the website is built, `index.html` will contain a *'Version: %%VERSION%%'* string.
+We need to change the `%%VERSION%%` marker with `$CI_COMMIT_SHORT_SHA`.
+That can be achieved by adding a `sed` command to `.gitlab-ci.yml`.
+`sed` can be used to substitute/replace strings in files and has the following usage:
+
+```bash
+sed -i 's/word1/word2/g' inputfile
+# -i: edit in place, modify the same file, do not create a new one
+# s: substitute
+# word1: word to find and substitute
+# word2: replace with this word
+# g: global, if we'd like to run sed for all files
+# inputfile: the file where it is run
+```
+
+Therefore, we need to add to `.gitlab-ci.yml`:
+`sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html`
+
+We can also test the deployment by checking the presence of some expected string in the served website.
+
+**NOTE**: In my tests, the display of `CI_COMMIT_SHORT_SHA` did not work; probably due to some interactions with some other JS code.
+
+`.gitlab-ci.yml`:
+```yaml
+image: node
+
+stages:
+  - build
+  - test
+  - deploy
+  - deployment tests
+
+build the website:
+  stage: build
+  script:
+    - echo $CI_COMMIT_SHORT_SHA
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+    - sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"
+
+deploy to surge:
+  stage: deploy
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain jumbled-can.surge.sh
+
+test deployment:
+  image: alpine
+  stage: deployment tests
+  script:
+    - apk add --no-cache curl
+    - curl -s "https://instazone.surge.sh" | grep -q "Hi people"
+    #- curl -s "https://instazone.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
+```
+
+### 3.2 Retrying Failed Jobs and Scheduling.
+
+If a job takes very long, it might happen that the next one fails due to timeout; thus, the pipeline fails.
+We can re-run any job or pipeline by clicking on the wheel arrow.
+
+We can also define schedules, eg., daily runs of a pipeline at a given time.
+Vertical menu: CI/CD, Schedules, New Schedule.
+
+### 3.3 Using Caches to Optimize the Build Speed
+
+Compared to other CI/CD tools such as Jenkins, Gitlab requires longer times for building, because docker images need to be built and run. In other words: we're always starting new, even with the dependencies.
+
+We can use caches to speed up that building process.
+Usually, **dependencies are cached** for the `build` job.
+However, cached files/folders are often define outside, globally, not just in the `build` job.
+When defined globally, they are used by all jobs.
+In our case, the dependencies are the ones downloaded with `npm install`.
+
+We need to specify
+- a `key`: usually a branch name comes here, which tells when to use the caching; we can also used the predefined environment variable `CI_COMMIT_REF_SLUG`;
+- a `path`: directory/file to save and use
+
+```yaml
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+```
+
+If we run our pipeline +2, from the 2nd time on, the pipeline will run faster.
+Note that sometimes caches missbehave; in these cases, we can clear the caches in the pipeline list/pane.
+
+`.gitlab-ci.yml`:
+```yaml
+image: node
+
+stages:
+  - build
+  - test
+  - deploy
+  - deployment tests
+
+build the website:
+  stage: build
+  script:
+    - echo $CI_COMMIT_SHORT_SHA
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+    - sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"
+
+deploy to surge:
+  stage: deploy
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain jumbled-can.surge.sh
+
+test deployment:
+  image: alpine
+  stage: deployment tests
+  script:
+    - apk add --no-cache curl
+    - curl -s "https://instazone.surge.sh" | grep -q "Hi people"
+    #- curl -s "https://instazone.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
+```
+
