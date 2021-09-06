@@ -68,6 +68,7 @@ We can improve that pipeline adding another job called `test the car` as follows
 - We define the job `test the car`, where the `car.txt` file is checked.
 - We define `stages` and assign each job a stage so that the order of job execution can be controlled.
 - If we don't assign a stage to a job, Gitlab automatically assigns the job the stage `test`
+- The order of the stage defines the order of execution of the jobs.
 - Note that each job is executed independently and the files produced in them are not saved unless we actively define `artifacts`.
 - The `test the car` job needs to check the content of the `car.txt` file created in the job `build the car` with `test` and `grep` Linux commands; therefore, we need to define `artifacts`and add the files/paths we'd like to save.
 - If we go to the vertical menu CI/CD > Jobs
@@ -151,6 +152,173 @@ gatsby build
 # We now open the local static-website project
 # with ane editor, say VS Code,
 # and create and edit a pipeline file:
-# gitlab-ci.yml
+# .gitlab-ci.yml
 ```
+
+### 2.1 First Gitlab Pipeline for the Static Website
+
+Now, we'd like to pack all this into a itlab pipeline.
+Notes for the CI/CD pipeline on Gitlab:
+- The file `static-website/package.json` defined all the dependencies needed for our website, which are installed in the git-ignored folder `static-website/node_modules`.
+- Since we use docker containers for CI, we actively need to install the dependencies every time, thus, the installation commands must appear in our `.gitlab-ci.yml` file.
+- Additionally, we need to take a `node` docker image for our pipeline, otherwise a default `ruby` image is used (which has no `node` platform).
+- If we want the static website bundle, we need to save it as an artifact.
+
+
+`.gitlab-ci.yml`:
+```yaml
+build the website:
+  image: node
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+  artifacts:
+    paths:
+      - ./public
+```
+
+The pipeline should be executed automatically.
+The execution can be check on the vertical menu `Pipeline`, and the artifacts that are generated can be downloaded/browsed.
+
+
+### 2.2 Adding a Test Stage
+
+A job that is successful returns `0`, otherwise a value in the range `1-255`.
+We can use this feature for executing unit tests.
+
+In our simple example, we check whether `public/index.html` contains a certain string: `Gatsby`:
+
+```bash
+cd public
+grep "Gatsby" index.html
+# Grep in quiet mode: no output
+grep "Gatsby" index.html
+# To get the return status of the last command
+echo $? # 0
+```
+
+Note that:
+- The default image is `ruby`. We need to specify the image if we want another one that `ruby`; often the small/lightweight Linux distro `alpine` is chosen.
+- Gatsby can serve the main website on `localhost:9000`, so we can check that using `curl` and `grep`; note that we need to add `tac` in-between so that `grep` receives the complete website.
+- If a command is expected to block the terminal because it runs forever (eg., `gatsby serve`), we should add `&` to it. That way, the command is run in the background. However, we might need to add a `sleep` before the next command in case it depends on the previous blocking one.
+
+`.gitlab-ci.yml`:
+```yaml
+stages:
+  - build
+  - test
+
+build the website:
+  image: node
+  stage: build
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  image: node
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"  
+```
+
+### 2.3 Deploying Our Website
+
+The service offered by [surge.sh](https://surge.sh/) is used to deploy the static website. Surge is a cloud platform for serverless deployments; serverless means basically: we don't care how it works, we just execute simple commands for deployment and the server takes care of everything. Surge works very nicely with statc websites.
+
+```bash
+# install surge
+npm install --global surge
+# go to the folder where the index.html is
+cd ~/git_repositories/static-website/public
+surge
+# we login/create a surge account
+# email
+# pw
+# a random name for the static website is suggested
+# jumbled-can.surge.sh
+# later on, we can change the name to a name acquired on namecheap.com
+# or another service!
+# firefox(jumbled-can.surge.sh)
+```
+
+### 2.4 Secrets
+
+Secrets can be used to manage credentials; we don't want to commit them to git repositories. For that, environment variables are generated in the Gitlab web interface which are then available on the docker containers that perform the CI/CD pipeline. Note that many CLI tools rely on environment variables that need to be set on the Gitlab web interface.
+
+```bash
+# go to the folder where the index.html is and surge was run
+cd ~/git_repositories/static-website/public
+# generate a token
+surge token
+# On `gitlab.com/...`, vertical menu:
+# Settings, CI/CD, Variables. We add the following:
+# SURGE_LOGIN <our email> 
+# SURGE_TOKEN <our newly generated token>
+```
+
+Now, we can create a new stage in which we deploy our website!
+Note the following remarks:
+- Since most jobs use the image `node`, we can put it up front and define `image` in jobs where it should be different than `node`.
+- The environment variables for logging into surge are already set on the Gitlab web interface.
+- We need to enconde the name of our website; either we use the name given by surge at the biginning or one we have specified on our surge account.
+- The job(s) of the `deploy` stage are executed only after the previous have been executed correctly.
+
+`.gitlab-ci.yml`:
+```yaml
+image: node
+
+stages:
+  - build
+  - test
+  - deploy
+
+build the website:
+  stage: build
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"  
+
+deploy to surge:
+  stage: deploy
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain jumbled-can.surge.sh
+```
+
+## Section 3: Gitlab CI Fundamentals
 
