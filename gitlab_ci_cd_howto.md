@@ -31,6 +31,20 @@ Therefore, CI/CD has these advantages:
 - It reduces the risk of a new deployment
 - It delivers value much faster
 
+The steps in the CI/CD pipeline can be broken down to the following phases:
+1. Coding: teams code together in a versioned (git) repository, following social coding techniques: frequent commits, parallel branches, pull requests, code reviews, merges, etc.
+2. CI Pipeline: Continuous Integration
+  - Build
+  - Code Quality checks
+  - Tests (eg., unit tests)
+  - Package: pack everything as it is going to be deployed
+3. CD Pipeline: Continuous Deployment/Delivery
+  - Review/Test
+  - Staging: pre-production simulated deployment
+  - Production: final deployment
+
+![CI/CD Pipeline by Valentin Despa](cicd_pipeline.jpg)
+
 Gitlab CI is gaining markets share in contrast to older CI/CD frameworks (e.g., Jenkins) because it integrates all steps for CI/CD in a platform.
 
 Gitlab can be used
@@ -423,8 +437,8 @@ test deployment:
   stage: deployment tests
   script:
     - apk add --no-cache curl
-    - curl -s "https://instazone.surge.sh" | grep -q "Hi people"
-    #- curl -s "https://instazone.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
+    - curl -s "https://jumbled-can.surge.sh" | grep -q "Hi people"
+    #- curl -s "https://jumbled-can.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
 ```
 
 ### 3.2 Retrying Failed Jobs and Scheduling.
@@ -457,6 +471,7 @@ cache:
 ```
 
 If we run our pipeline +2, from the 2nd time on, the pipeline will run faster.
+The first time we run our pipeline with the cache definition, the shell will have an error message due to the missing cache folder/file; however, it immediately creates one after checking that it is missing.
 Note that sometimes caches missbehave; in these cases, we can clear the caches in the pipeline list/pane.
 
 `.gitlab-ci.yml`:
@@ -468,6 +483,11 @@ stages:
   - test
   - deploy
   - deployment tests
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
 
 build the website:
   stage: build
@@ -507,7 +527,187 @@ test deployment:
   stage: deployment tests
   script:
     - apk add --no-cache curl
-    - curl -s "https://instazone.surge.sh" | grep -q "Hi people"
-    #- curl -s "https://instazone.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
+    - curl -s "https://jumbled-can.surge.sh" | grep -q "Hi people"
+    #- curl -s "https://jumbled-can.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
+```
+
+#### Cache vs Artififacts
+
+Both seem similar, but serve different purposes.
+Artifacts are used to pass data products between jobs.
+Caches are not to be used to store build results, but they should be used to store temporary project dependencies.
+
+### 3.4 Deployment Environments
+
+The CI/CD pipeline is more complex than the compilation of steps we have so far (see Section 1, Introduction).
+
+By now, we do the continuous integration (CD) and then directly deploy it; however, it is very recommendable to add testing and staging steps before having the website live.
+
+Additionally, we can use `environments`, which allow us to track deployments and their full history.
+
+To activate environments, we need to add the following to deployment jobs:
+```yaml
+# deploy staging
+enviornment:
+  name: staging
+  url: https://jumbled-can-staging.surge.sh
+```
+
+Once jobs with environments have been launched, these can be seen under:
+Vertical menu, Deployments, Environments; the environments and their URLs will appear.
+
+`.gitlab-ci.yml`:
+```yaml
+image: node
+
+stages:
+  - build
+  - test
+  - deploy staging
+  - deploy production
+  - production tests
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+build the website:
+  stage: build
+  script:
+    - echo $CI_COMMIT_SHORT_SHA
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+    - sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"
+
+deploy staging:
+  stage: deploy staging
+  environment:
+    name: staging
+    #url: https://jumbled-can-staging.surge.sh
+    url: https://jumbled-can.surge.sh
+  script:
+    - npm install --global surge
+    # usually, for staging we'd use a different domain than jumbled-can.surge.sh
+    - surge --project ./public --domain jumbled-can.surge.sh
+
+deploy production:
+  stage: deploy production
+  environment:
+    name: production
+    url: https://jumbled-can.surge.sh
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain jumbled-can.surge.sh
+
+production tests:
+  image: alpine
+  stage: production tests
+  script:
+    - apk add --no-cache curl
+    - curl -s "https://jumbled-can.surge.sh" | grep -q "Hi people"
+    #- curl -s "https://jumbled-can.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
+```
+
+### 3.5 Variables
+
+We can define our own variables in the Gitlab web interface and also in the `.gitlab-ci.yml` file.
+For instance, it makes sense to define variables for repeated things, such as the URL of our website.
+
+If we do it in the file, we need to define `variables` in the global scope, although we can also define in-job variables following the same structure.
+
+`.gitlab-ci.yml`:
+```yaml
+image: node
+
+stages:
+  - build
+  - test
+  - deploy staging
+  - deploy production
+  - production tests
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+variables:
+  #STAGING_DOMAIN: jumbled-can-staging.surge.sh
+  STAGING_DOMAIN: jumbled-can.surge.sh
+  PRODUCTION_DOMAIN: jumbled-can.surge.sh
+
+build the website:
+  stage: build
+  script:
+    - echo $CI_COMMIT_SHORT_SHA
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+    - sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"
+
+deploy staging:
+  stage: deploy staging
+  environment:
+    name: staging
+    url: https://$STAGING_DOMAIN
+  script:
+    - npm install --global surge
+    # usually, for staging we'd use a different domain than jumbled-can.surge.sh
+    - surge --project ./public --domain $STAGING_DOMAIN
+
+deploy production:
+  stage: deploy production
+  environment:
+    name: production
+    url: https://$PRODUCTION_DOMAIN
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain $PRODUCTION_DOMAIN
+
+production tests:
+  image: alpine
+  stage: production tests
+  script:
+    - apk add --no-cache curl
+    - curl -s "https://$PRODUCTION_DOMAIN" | grep -q "Hi people"
+    #- curl -s "https://$PRODUCTION_DOMAIN" | grep -q "$CI_COMMIT_SHORT_SHA"
 ```
 
