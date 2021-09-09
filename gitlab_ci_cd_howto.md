@@ -253,7 +253,7 @@ test website:
 
 ### 2.3 Deploying Our Website
 
-The service offered by [surge.sh](https://surge.sh/) is used to deploy the static website. Surge is a cloud platform for serverless deployments; serverless means basically: we don't care how it works, we just execute simple commands for deployment and the server takes care of everything. Surge works very nicely with statc websites.
+The service offered by [surge.sh](https://surge.sh/) is used to deploy the static website. Surge is a cloud platform for serverless deployments; serverless means basically: we don't care how it works, we just execute simple commands for deployment and the server takes care of everything. Surge works very nicely with statc websites; it dynamically generates addresses.
 
 ```bash
 # install surge
@@ -710,4 +710,369 @@ production tests:
     - curl -s "https://$PRODUCTION_DOMAIN" | grep -q "Hi people"
     #- curl -s "https://$PRODUCTION_DOMAIN" | grep -q "$CI_COMMIT_SHORT_SHA"
 ```
+
+### 3.6 Manual Reviews / Triggers
+
+After the staging step, our compiled code would go directly into production unless we add a manual trigger. For that, we add `when: manual` to the `deploy production` job; as a consequence, the production deployment will get a play button on the Gitlab web interface and the pipeline remains blocked waiting for manual intervention when we run it.
+
+`.gitlab-ci.yml`:
+```yaml
+image: node
+
+stages:
+  - build
+  - test
+  - deploy staging
+  - deploy production
+  - production tests
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+variables:
+  #STAGING_DOMAIN: jumbled-can-staging.surge.sh
+  STAGING_DOMAIN: jumbled-can.surge.sh
+  PRODUCTION_DOMAIN: jumbled-can.surge.sh
+
+build the website:
+  stage: build
+  script:
+    - echo $CI_COMMIT_SHORT_SHA
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+    - sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"
+
+deploy staging:
+  stage: deploy staging
+  environment:
+    name: staging
+    url: https://$STAGING_DOMAIN
+  script:
+    - npm install --global surge
+    # usually, for staging we'd use a different domain than jumbled-can.surge.sh
+    - surge --project ./public --domain $STAGING_DOMAIN
+
+deploy production:
+  stage: deploy production
+  environment:
+    name: production
+    url: https://$PRODUCTION_DOMAIN
+  when: manual
+  # use the following to force blocking the pipeline when reached this point
+  allow_failure: false
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain $PRODUCTION_DOMAIN
+
+production tests:
+  image: alpine
+  stage: production tests
+  script:
+    - apk add --no-cache curl
+    - curl -s "https://$PRODUCTION_DOMAIN" | grep -q "Hi people"
+    #- curl -s "https://$PRODUCTION_DOMAIN" | grep -q "$CI_COMMIT_SHORT_SHA"
+```
+
+### 3.7 Merge Requests
+
+Merge Requests in Gitlab are equivalent to the Pull Requests in Github.
+
+We should develop each feature in a separate branch which is later merged to the master.
+That way, the master is always deployable.
+However, the pipeline is going to be executed in every branch that contains the file `.gitlab-ci.yml`, and some jobs (staging, production, tests) need not be executed; we can avoid that by adding `only: - master` in those jobs, if we'd like to execute the complete pipeline only for the `master` branch, for instance. Similarly, we can also specify to run the job for `merge_requests` too.
+
+Note that in the settings of the repository we can control who can merge or even push to any branch, including the `master`; that way, we leverage the merge requests.
+
+`.gitlab-ci.yml`:
+```yaml
+image: node
+
+stages:
+  - build
+  - test
+  - deploy staging
+  - deploy production
+  - production tests
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+variables:
+  #STAGING_DOMAIN: jumbled-can-staging.surge.sh
+  STAGING_DOMAIN: jumbled-can.surge.sh
+  PRODUCTION_DOMAIN: jumbled-can.surge.sh
+
+build the website:
+  stage: build
+  script:
+    - echo $CI_COMMIT_SHORT_SHA
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+    - sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html
+  artifacts:
+    paths:
+      - ./public
+
+test artifact:
+  image: alpine
+  stage: test
+  script:
+    - grep -q "Gatsby" ./public/index.html
+
+test website:
+  stage: test
+  script:
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby serve &
+    - sleep 3
+    - curl "http://localhost:9000" | tac | tac | grep -q "Gatsby"
+
+deploy staging:
+  stage: deploy staging
+  environment:
+    name: staging
+    url: https://$STAGING_DOMAIN
+  only:
+    - master
+    - merge_requests
+  script:
+    - npm install --global surge
+    # usually, for staging we'd use a different domain than jumbled-can.surge.sh
+    - surge --project ./public --domain $STAGING_DOMAIN
+
+deploy production:
+  stage: deploy production
+  environment:
+    name: production
+    url: https://$PRODUCTION_DOMAIN
+  when: manual
+  # use the following to force blocking the pipeline when reached this point
+  allow_failure: false
+  only:
+    - master
+    - merge_requests
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain $PRODUCTION_DOMAIN
+
+production tests:
+  image: alpine
+  stage: production tests
+  only:
+    - master
+    - merge_requests    
+  script:
+    - apk add --no-cache curl
+    - curl -s "https://$PRODUCTION_DOMAIN" | grep -q "Hi people"
+    #- curl -s "https://$PRODUCTION_DOMAIN" | grep -q "$CI_COMMIT_SHORT_SHA"
+```
+
+### 3.8 Dynamic Environments
+
+Since we can track and visualize the deployments that belong to all defined environments, we can basically create an environment foreach feature that is being merged, so that the Product Owner reviews it.
+
+That can be achieved adding a `deploy review` job which has a parametrized environment definition (ie., with variables), as follows:
+
+```yaml
+deploy review:
+  stage: deploy review
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    url: https://<name>-$CI_ENVIRONMENT_SLUG.surge.sh
+  only:
+    - merge_requests
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain https://<name>-$CI_ENVIRONMENT_SLUG.surge.sh
+```
+
+Once a branch has been merged, we need to stop and destroy environments.
+We can do that defining a job `stop review` which executes the command `surge teardown URL`.
+Additionally, we need to make sure that this job is executed after the `deploy review`.
+
+```yaml
+deploy review:
+  stage: deploy review
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    url: https://<name>-$CI_ENVIRONMENT_SLUG.surge.sh
+    on_stop: stop review
+  only:
+    - merge_requests
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain https://<name>-$CI_ENVIRONMENT_SLUG.surge.sh
+
+stop review:
+  stage: deploy review
+  only:
+      - merge_requests
+  variables:
+    # to avoid clonning this repo
+    GIT_STRATEGY: none
+  script:
+    - echo "Remove review app"
+    - npm install --global surge
+    - surge teardown https://<name>-$CI_ENVIRONMENT_SLUG.surge.sh
+  when: manual
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    action: stop
+```
+
+### 3.9 Before and After Scripts
+
+Either globally or inside a job, we can define `before_script` and `after_script`, which are equivalent to `script` but are executed just before and after it.
+
+Frequenty `before_script` is used all necessary installation commands.
+In contrast, `after_script` is a bit trickier in terms of working directory and context, we need to look the documentation.
+
+```yaml
+deploy production:
+  stage: deploy production
+  environment:
+    name: production
+    url: https://$PRODUCTION_DOMAIN
+  when: manual
+  allow_failure: false
+  only:
+    - master
+    - merge_requests
+  before_script:
+    - npm install --global surge
+  script:
+    - surge --project ./public --domain $PRODUCTION_DOMAIN
+```
+
+## Section 4: YAML Basics
+
+In this section, YAML features which can be used to make more powerful pipeline definitions are explained.
+
+Some important features:
+- In YAML, we can write key-value pairs; values can be numbers, strings or other objects.
+- We can define array elements with `-`
+- We can convert YAMLs to JSONs, and back: [JSON2YAML](https://codebeautify.org/yaml-to-json-xml-csv)
+- In contrast to JSON, YAML allows comments
+
+```yaml
+person:
+  name: John
+  surname: "Doe"
+  age: 29
+  isMale: true
+  stuff:
+    - laptop
+    - car
+    - bike
+  food: [pizza, donuts, coke]
+  # Array of objects
+  # note that each object element is delimited with - 
+  # whereas the elements with an object are separated with new lines
+  friends:
+    - name: Jane
+      age: 19
+    - name: Mikel
+      age: 22
+```
+
+### 4.1 Disabling Jobs
+
+We can disable a job just by putting a dot in front of its name:
+
+```yaml
+.my job:
+  stage: build
+  script:
+    - echo "My job"
+```
+
+### 4.2 Anchors and Job Templates
+
+We can define anchors variables ith `&` and use their values with `*`; this way, we don't need to duplicate values.
+Additionally, base object classes can be created, which are then merged.
+
+```yaml
+base_person: &base
+  city: nyc
+  country: usa
+
+person:
+  # This will merge the base_person keys to the current person
+  <<: *base
+  name: John
+  surname: "Doe"
+  age: 29
+  isMale: true
+  stuff:
+    - laptop
+    - car
+    - bike
+  food: [pizza, donuts, coke]
+  # Array of objects
+  # note that each object element is delimited with - 
+  # whereas the elements with an object are separated with new lines
+  friends:
+    - name: &wife-name Jane
+      age: 19
+    - name: Mikel
+      age: 22
+  wife: *wife-name
+```
+
+We can use anchors to create job templates!
+That makes sense for instance for `deploy` jobs, which are similar.
+For that, a template and inactivated job `.deploy_template` is created and the deploy jobs use it.
+
+```yaml
+.deploy_template: &deploy
+  only:
+    - master
+  script:
+    - npm install --global surge
+    - surge --project ./public --domain $DOMAIN
+  environment:
+    url: http://$DOMAIN
+
+deploy staging:
+  <<: *deploy
+  stage: deploy staging
+  variables:
+    DOMAIN: $STAGING_DOMAIN
+  environment:
+    name: staging
+  
+deploy production:
+  <<: *deploy
+  stage: deploy production
+  variables:
+    DOMAIN: $PRODUCTION_DOMAIN
+  environment:
+    name: production
+```
+
 
