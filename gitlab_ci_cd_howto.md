@@ -15,7 +15,9 @@ Overview:
 2. Basic CI/CD Workflow with Gitlab
 3. Gitlab CI Fundamentals
 4. YAML Basics
-5. Deploying an Application
+5. Deploying a Complex Application
+
+I thoroughly did all 1-4 sections and tried them myself, but I just watched the Section 5 and made some notes.
 
 ## Section 1: Introduction
 
@@ -1075,4 +1077,43 @@ deploy production:
     name: production
 ```
 
+## Section 5: Deplyment of a Complex Java Application
+
+The Java application delivers car information on a REST API, using Postman, and hosted on AWS.
+It is a nice example for cloud deployments.
+
+The instructor has tutorials and courses on Postman:
+- [Postman API tutorial for beginners](https://www.youtube.com/watch?v=FjgYtQK_zLE)
+- [Postman: The Complete Guide - REST API Testing](https://www.udemy.com/course/postman-the-complete-guide/?referralCode=4E8B90BA4B5EE8DA9237)
+
+The source code is complied with IntelliJ using Gradle and then it can be executed on a JVM.
+
+During the compilation, a `build` folder is created which contains the ``cars-api.jar` binary - the artifact.
+
+In the Gitlab CI/CD file `.gitlab-ci.yml`, we basically define the compilation job using the `gradlew` command in the script.
+
+We can define a smoke test job in which we test whether the app can run, just executing it with `jave -jar ...`.
+
+And then, we scale up in complexity adding all stages...
+
+AWS services are used in the example; cloud services are great because:
+- we have virtual servers maintained by the provider
+- we can scale up/down as we need
+
+The service AWS Elastic Beanstalk is used in the course; this accomplishes a serverless approach to deploying applications: we just let it run there and do not have to care about the configuration (it can handle many language-specific tools) of the machine or its characteristics (RAM, CPU, etc.) - that's what serverless means: the server disappears for the developer.
+
+Amozon S3 (a kind of Dropbox) is used to upload our artifacts, which are then passed to AWS Elastic Beanstalk. For the upload an AWS-CLI tool is used, which can be accessed as a docker image/container employed in a job. For the configuration, Gitlab variables are used to store AWS tokens.
+
+**Static code analysis** is also employed in a dedicated job.
+That is achieved with PMD, which works for Java.
+This tool detects violations of standards and good practices after observing the source code.
+
+**Unit tests** are also used in a dedicated job.
+Unit tests are small tests that run very fast.
+For that a class that defines tests is created; for instance, the class has a function that averages all car years and a given value is expected.
+
+API testing in done using Postman.
+An image created by the instructor is used to create job.
+
+The pipeline results can be published simply as artifacts or, in addition, using Gitlab pages, which are used in this section.
 
