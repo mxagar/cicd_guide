@@ -45,7 +45,7 @@ The steps in the CI/CD pipeline can be broken down to the following phases:
   - Staging: pre-production simulated deployment
   - Production: final deployment
 
-![CI/CD Pipeline by Valentin Despa](cicd_pipeline.jpg)
+![CI/CD Pipeline by Valentin Despa](./pics/cicd_pipeline.jpg)
 
 Gitlab CI is gaining markets share in contrast to older CI/CD frameworks (e.g., Jenkins) because it integrates all steps for CI/CD in a platform.
 
