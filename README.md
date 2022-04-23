@@ -2,9 +2,8 @@
 
 This folder contains the notes made by me after following two Udemy courses:
 
-- the first by Valentin Despa, focused on Gitlab: [*GitLab CI: Pipelines, CI/CD and DevOps for Beginners*](https://www.udemy.com/course/gitlab-ci-pipelines-ci-cd-and-devops-for-beginners/).
-- the second by Ali Alaa, which deals with Github: [*The Complete GitHub Actions & Workflows Guide
-*](https://www.udemy.com/course/github-actions/)
+- the first by Valentin Despa, focused on Gitlab: [GitLab CI: Pipelines, CI/CD and DevOps for Beginners](https://www.udemy.com/course/gitlab-ci-pipelines-ci-cd-and-devops-for-beginners/).
+- the second by Ali Alaa, which deals with Github: [The Complete GitHub Actions & Workflows Guide](https://www.udemy.com/course/github-actions/)
 
 ## Gitlab Pipelines
 
