@@ -11,6 +11,8 @@ Some basic definitions:
 - CI = Continuous Integration = Automated Testing. In other words, we make sure that any change we implement can be integrated in the code base without breaking it, i.e., the new implementations are integrable. CI makes possible to deploy our code any time, i.e., continuous deployment!
 - CD = Continuous Deployment = Deploy code/applications verified by CI automatically, without time gaps from the implementation integration. That way, the latest version of an app is always available to the users.
 
+In this guide Gitlab Pipelines and Github Actions are introduced; however, there are other popular tools, such as CircleCI, TravisCI, and Jenkins.
+
 ## Gitlab Pipelines
 
 A PDF of the course note created by the instructor (Valentin Despa) can be downloaded from
