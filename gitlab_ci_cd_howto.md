@@ -1,27 +1,56 @@
 # CI/CI Pipelines with Gitlab
 
-Notes written after following
-Udemy course by Valentin Despa
-GitLab CI: Pipelines, CI/CD and DevOps for Beginners.
+Notes written after following Udemy course by Valentin Despa
+
+[GitLab CI: Pipelines, CI/CD and DevOps for Beginners](https://www.udemy.com/course/gitlab-ci-pipelines-ci-cd-and-devops-for-beginners/).
 
 A PDF of the course note created by the instructor can be downloaded from
+
 [gitlab-ci-course-notes.pdf](https://buildmedia.readthedocs.org/media/pdf/gitlab-ci-course-notes/latest/)
 
 Mikel Sagardia, 2021.
 No warranties.
 
-Overview:
-1. Introduction
-2. Basic CI/CD Workflow with Gitlab
-3. Gitlab CI Fundamentals
-4. YAML Basics
-5. Deploying a Complex Application
+## Table of Contents
+
+- [CI/CI Pipelines with Gitlab](#cici-pipelines-with-gitlab)
+  - [Table of Contents](#table-of-contents)
+  - [Section 1: Introduction](#section-1-introduction)
+    - [1.1 Introductory example: `build a car`](#11-introductory-example-build-a-car)
+    - [1.2 Gitlab Architecture](#12-gitlab-architecture)
+  - [Section 2: Basic CI/CD Workflow with Gitlab](#section-2-basic-cicd-workflow-with-gitlab)
+    - [2.1 First Gitlab Pipeline for the Static Website](#21-first-gitlab-pipeline-for-the-static-website)
+    - [2.2 Adding a Test Stage](#22-adding-a-test-stage)
+    - [2.3 Deploying Our Website](#23-deploying-our-website)
+    - [2.4 Secrets](#24-secrets)
+  - [Section 3: Gitlab CI Fundamentals](#section-3-gitlab-ci-fundamentals)
+    - [3.1 Predefined Variables](#31-predefined-variables)
+      - [Example: `CI_COMMIT_SHORT_SHA`](#example-ci_commit_short_sha)
+    - [3.2 Retrying Failed Jobs and Scheduling.](#32-retrying-failed-jobs-and-scheduling)
+    - [3.3 Using Caches to Optimize the Build Speed](#33-using-caches-to-optimize-the-build-speed)
+      - [Cache vs Artifacts](#cache-vs-artifacts)
+    - [3.4 Deployment Environments](#34-deployment-environments)
+    - [3.5 Variables](#35-variables)
+    - [3.6 Manual Reviews / Triggers](#36-manual-reviews--triggers)
+    - [3.7 Merge Requests](#37-merge-requests)
+    - [3.8 Dynamic Environments](#38-dynamic-environments)
+    - [3.9 Before and After Scripts](#39-before-and-after-scripts)
+  - [Section 4: YAML Basics](#section-4-yaml-basics)
+    - [4.1 Disabling Jobs](#41-disabling-jobs)
+    - [4.2 Anchors and Job Templates](#42-anchors-and-job-templates)
+  - [Section 5: Deployment of a Complex Java Application](#section-5-deployment-of-a-complex-java-application)
 
 I thoroughly did all 1-4 sections and tried them myself, but I just watched the Section 5 and made some notes.
 
 ## Section 1: Introduction
 
+Some basic definitions:
+
+- CI = Continuous Integration = Automated Testing. In other words, we make sure that any change we implement can be integrated in the code base without breaking it, i.e., the new implementations are integrable. CI makes possible to deploy our code any time, i.e., continuous deployment!
+- CD = Continuous Deployment = Deploy code/applications verified by CI automatically, without time gaps from the implementation integration. That way, the latest version of an app is always available to the users.
+
 As I understand, **Continuous Integration and Continuous Delivery (CI/CD)** consists in:
+
 - Frequently merging new features to our versioned code
 - Automatically and frequently building our codebase
 - Assessing the quality of our code
@@ -29,17 +58,20 @@ As I understand, **Continuous Integration and Continuous Delivery (CI/CD)** cons
 - Frequently deploying our packages to production; deployment encompasses: installation in an environment and tests
 
 Therefore, CI/CD has these advantages:
+
 - It ensures that changes are releasable
 - It reduces the risk of a new deployment
 - It delivers value much faster
 
 The steps in the CI/CD pipeline can be broken down to the following phases:
+
 1. Coding: teams code together in a versioned (git) repository, following social coding techniques: frequent commits, parallel branches, pull requests, code reviews, merges, etc.
 2. CI Pipeline: Continuous Integration
   - Build
   - Code Quality checks
   - Tests (eg., unit tests)
   - Package: pack everything as it is going to be deployed
+
 3. CD Pipeline: Continuous Deployment/Delivery
   - Review/Test
   - Staging: pre-production simulated deployment
@@ -73,6 +105,7 @@ build the car:
 ```
 
 Right vertical menu: CI/CD, Pipelines:
+
 - We'll see the pipeline which is executed
 - If we click on the job, we'll see the terminal execution of the pipelines.
 - We have currently one job, `build the car`, but we can add more jobs.
@@ -81,6 +114,7 @@ Right vertical menu: CI/CD, Pipelines:
 - Note that 2 spaces must be used for indenting the YAML files.
 
 We can improve that pipeline adding another job called `test the car` as follows:
+
 - We define the job `test the car`, where the `car.txt` file is checked.
 - We define `stages` and assign each job a stage so that the order of job execution can be controlled.
 - If we don't assign a stage to a job, Gitlab automatically assigns the job the stage `test`
@@ -124,6 +158,7 @@ test the car:
 ### 1.2 Gitlab Architecture
 
 We have two main elements:
+
 1. The **Gitlab server**: it offers the functionality for creating repositories and it saves them in databases. It also controls the pipelines we create, but it delegates their execution to the Gitlab runners.
 2. The **Gitlab runners**: docker containers that run the jobs/tasks we define in the pipeline; the Gitlab runners are launched and managed by the Gitlab server. Each runner is also in charge of saving the artifacts. We can also scale up/down the number of runners used for the jobs.
 
@@ -173,8 +208,9 @@ gatsby build
 
 ### 2.1 First Gitlab Pipeline for the Static Website
 
-Now, we'd like to pack all this into a itlab pipeline.
+Now, we'd like to pack all this into a Gitlab pipeline.
 Notes for the CI/CD pipeline on Gitlab:
+
 - The file `static-website/package.json` defined all the dependencies needed for our website, which are installed in the git-ignored folder `static-website/node_modules`.
 - Since we use docker containers for CI, we actively need to install the dependencies every time, thus, the installation commands must appear in our `.gitlab-ci.yml` file.
 - Additionally, we need to take a `node` docker image for our pipeline, otherwise a default `ruby` image is used (which has no `node` platform).
@@ -215,6 +251,7 @@ echo $? # 0
 ```
 
 Note that:
+
 - The default image is `ruby`. We need to specify the image if we want another one that `ruby`; often the small/lightweight Linux distro `alpine` is chosen.
 - Gatsby can serve the main website on `localhost:9000`, so we can check that using `curl` and `grep`; note that we need to add `tac` in-between so that `grep` receives the complete website.
 - If a command is expected to block the terminal because it runs forever (eg., `gatsby serve`), we should add `&` to it. That way, the command is run in the background. However, we might need to add a `sleep` before the next command in case it depends on the previous blocking one.
@@ -255,7 +292,7 @@ test website:
 
 ### 2.3 Deploying Our Website
 
-The service offered by [surge.sh](https://surge.sh/) is used to deploy the static website. Surge is a cloud platform for serverless deployments; serverless means basically: we don't care how it works, we just execute simple commands for deployment and the server takes care of everything. Surge works very nicely with statc websites; it dynamically generates addresses.
+The service offered by [surge.sh](https://surge.sh/) is used to deploy the static website. Surge is a cloud platform for serverless deployments; serverless means basically: we don't care how it works, we just execute simple commands for deployment and the server takes care of everything. Surge works very nicely with static websites; it dynamically generates addresses.
 
 ```bash
 # install surge
@@ -290,6 +327,7 @@ surge token
 
 Now, we can create a new stage in which we deploy our website!
 Note the following remarks:
+
 - Since most jobs use the image `node`, we can put it up front and define `image` in jobs where it should be different than `node`.
 - The environment variables for logging into surge are already set on the Gitlab web interface.
 - We need to enconde the name of our website; either we use the name given by surge at the biginning or one we have specified on our surge account.
@@ -339,10 +377,10 @@ deploy to surge:
 ## Section 3: Gitlab CI Fundamentals
 
 Overview of the most important aspects reviewed in this section:
+
 - Environment variables.
 - Scheduling of pipeline runs.
 - Using cache to seep up builds.
-
 
 ### 3.1 Predefined Variables
 
@@ -352,6 +390,7 @@ Gitlab uses many **predefined** environment variables collected in this list:
 Howver, more importantly, **we can also define variables according to the needs of the packages we use**, as we did with `surge`.
 
 Some of the variables commented in this section:
+
 - `CI_COMMIT_SHORT_SHA`: hash of the last commit done before running the pipeline.
 
 #### Example: `CI_COMMIT_SHORT_SHA`
@@ -462,6 +501,7 @@ When defined globally, they are used by all jobs.
 In our case, the dependencies are the ones downloaded with `npm install`.
 
 We need to specify
+
 - a `key`: usually a branch name comes here, which tells when to use the caching; we can also used the predefined environment variable `CI_COMMIT_REF_SLUG`;
 - a `path`: directory/file to save and use
 
@@ -533,7 +573,7 @@ test deployment:
     #- curl -s "https://jumbled-can.surge.sh" | grep -q "$CI_COMMIT_SHORT_SHA"
 ```
 
-#### Cache vs Artififacts
+#### Cache vs Artifacts
 
 Both seem similar, but serve different purposes.
 Artifacts are used to pass data products between jobs.
@@ -548,6 +588,7 @@ By now, we do the continuous integration (CD) and then directly deploy it; howev
 Additionally, we can use `environments`, which allow us to track deployments and their full history.
 
 To activate environments, we need to add the following to deployment jobs:
+
 ```yaml
 # deploy staging
 enviornment:
@@ -559,6 +600,7 @@ Once jobs with environments have been launched, these can be seen under:
 Vertical menu, Deployments, Environments; the environments and their URLs will appear.
 
 `.gitlab-ci.yml`:
+
 ```yaml
 image: node
 
@@ -638,6 +680,7 @@ For instance, it makes sense to define variables for repeated things, such as th
 If we do it in the file, we need to define `variables` in the global scope, although we can also define in-job variables following the same structure.
 
 `.gitlab-ci.yml`:
+
 ```yaml
 image: node
 
@@ -718,6 +761,7 @@ production tests:
 After the staging step, our compiled code would go directly into production unless we add a manual trigger. For that, we add `when: manual` to the `deploy production` job; as a consequence, the production deployment will get a play button on the Gitlab web interface and the pipeline remains blocked waiting for manual intervention when we run it.
 
 `.gitlab-ci.yml`:
+
 ```yaml
 image: node
 
@@ -807,6 +851,7 @@ However, the pipeline is going to be executed in every branch that contains the 
 Note that in the settings of the repository we can control who can merge or even push to any branch, including the `master`; that way, we leverage the merge requests.
 
 `.gitlab-ci.yml`:
+
 ```yaml
 image: node
 
@@ -976,6 +1021,7 @@ deploy production:
 In this section, YAML features which can be used to make more powerful pipeline definitions are explained.
 
 Some important features:
+
 - In YAML, we can write key-value pairs; values can be numbers, strings or other objects.
 - We can define array elements with `-`
 - We can convert YAMLs to JSONs, and back: [JSON2YAML](https://codebeautify.org/yaml-to-json-xml-csv)
@@ -1077,18 +1123,19 @@ deploy production:
     name: production
 ```
 
-## Section 5: Deplyment of a Complex Java Application
+## Section 5: Deployment of a Complex Java Application
 
 The Java application delivers car information on a REST API, using Postman, and hosted on AWS.
 It is a nice example for cloud deployments.
 
 The instructor has tutorials and courses on Postman:
+
 - [Postman API tutorial for beginners](https://www.youtube.com/watch?v=FjgYtQK_zLE)
 - [Postman: The Complete Guide - REST API Testing](https://www.udemy.com/course/postman-the-complete-guide/?referralCode=4E8B90BA4B5EE8DA9237)
 
 The source code is complied with IntelliJ using Gradle and then it can be executed on a JVM.
 
-During the compilation, a `build` folder is created which contains the ``cars-api.jar` binary - the artifact.
+During the compilation, a `build` folder is created which contains the `cars-api.jar` binary - the artifact.
 
 In the Gitlab CI/CD file `.gitlab-ci.yml`, we basically define the compilation job using the `gradlew` command in the script.
 
@@ -1097,12 +1144,13 @@ We can define a smoke test job in which we test whether the app can run, just ex
 And then, we scale up in complexity adding all stages...
 
 AWS services are used in the example; cloud services are great because:
+
 - we have virtual servers maintained by the provider
 - we can scale up/down as we need
 
 The service AWS Elastic Beanstalk is used in the course; this accomplishes a serverless approach to deploying applications: we just let it run there and do not have to care about the configuration (it can handle many language-specific tools) of the machine or its characteristics (RAM, CPU, etc.) - that's what serverless means: the server disappears for the developer.
 
-Amozon S3 (a kind of Dropbox) is used to upload our artifacts, which are then passed to AWS Elastic Beanstalk. For the upload an AWS-CLI tool is used, which can be accessed as a docker image/container employed in a job. For the configuration, Gitlab variables are used to store AWS tokens.
+Amazon S3 (a kind of Dropbox) is used to upload our artifacts, which are then passed to AWS Elastic Beanstalk. For the upload an AWS-CLI tool is used, which can be accessed as a docker image/container employed in a job. For the configuration, Gitlab variables are used to store AWS tokens.
 
 **Static code analysis** is also employed in a dedicated job.
 That is achieved with PMD, which works for Java.
