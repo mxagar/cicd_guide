@@ -17,6 +17,9 @@ No warranties.
   - [1. Introduction](#1-introduction)
     - [Example 1: Template for Python App Integration](#example-1-template-for-python-app-integration)
     - [Example 2: Test Actions with Templates for Simple Automations or Python Apps](#example-2-test-actions-with-templates-for-simple-automations-or-python-apps)
+      - [`python-app.yaml`, automatically generated](#python-appyaml-automatically-generated)
+        - [`requirements.txt`](#requirementstxt)
+        - [`app.py` and `test_app.py`](#apppy-and-test_apppy)
 
 ## 1. Introduction
 
@@ -116,8 +119,7 @@ Other workflows: **Python App**
 
 File contents
 
-
-`python-app.yaml`, automatically generated:
+#### `python-app.yaml`, automatically generated
 
 ```yaml
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
@@ -162,13 +164,13 @@ jobs:
 
 ```
 
-`requirements.txt`:
+##### `requirements.txt`
 
 ```
 numpy
 ```
 
-`app.py` and `test_app.py`:
+##### `app.py` and `test_app.py`
 
 ```python
 ### app.py
